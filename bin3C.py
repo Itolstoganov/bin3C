@@ -187,10 +187,11 @@ if __name__ == '__main__':
                 cm.min_sig = min_signal
                 cm.set_primary_acceptance_mask(min_sig=min_signal, min_len=min_reflen, update=True)
 
+            # print(cm.processed_map)
             # cluster the entire map
             clustering = cluster_map(cm, method='infomap', seed=args.seed, work_dir=args.OUTDIR)
             # generate report per cluster
-            cluster_report(cm, clustering, is_spades=not args.no_spades)
+            # cluster_report(cm, clustering, is_spades=not args.no_spades)
             # write MCL clustering file
             write_mcl(cm, os.path.join(args.OUTDIR, 'clustering.mcl'), clustering)
             # serialize full clustering object

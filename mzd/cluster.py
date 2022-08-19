@@ -153,7 +153,16 @@ def cluster_map(contact_map, seed, method='infomap', min_len=None, min_sig=None,
     assert os.path.exists(work_dir), 'supplied output path [{}] does not exist'.format(work_dir)
 
     base_name = 'cm_graph'
-    g = to_graph(contact_map, min_len=min_len, min_sig=min_sig, norm=True, bisto=True, scale=True)
+    # RAW SCORE OUTPUT HERE
+    raw_graph = to_graph(contact_map, min_len=min_len, min_sig=min_sig, extern_ids=False, norm=False, bisto=False, scale=True)
+    raw_edge_file = _write_edges(raw_graph, work_dir, base_name + "_raw")
+    nx.write_edgelist(raw_graph, raw_edge_file, data=['weight'])
+
+    # bisto_graph = to_graph(contact_map, min_len=min_len, min_sig=min_sig, extern_ids=False, norm=False, bisto=True, scale=True)
+    # bisto_edge_file = _write_edges(bisto_graph, work_dir, base_name + "_bisto")
+    # nx.write_edgelist(bisto_graph, bisto_edge_file, data=['weight'])
+    # RAW SCORE OUTPUT END
+    g = to_graph(contact_map, min_len=min_len, min_sig=min_sig, extern_ids=False, norm=True, bisto=True, scale=True)
 
     method = method.lower()
     logger.info('Clustering contact graph using method: {}'.format(method))
@@ -209,8 +218,10 @@ def cluster_map(contact_map, seed, method='infomap', min_len=None, min_sig=None,
         _ord = SeqOrder.asindex(np.sort(_seqs))
         # IMPORTANT!! sequences are remapped to their gapless indices
         _seqs = contact_map.order.remap_gapless(_ord)['index']
+        # print(_ord, _seqs)
 
         clustering[cl_id] = {
+            'ord_ids': _ord,
             'seq_ids': _seqs,
             'extent': contact_map.order.lengths()[_seqs].sum()
             # TODO add other details for clusters here
@@ -305,7 +316,9 @@ def to_graph(contact_map, norm=True, bisto=False, scale=False, extern_ids=False,
         # update the acceptance mask if user has specified new criteria
         contact_map.set_primary_acceptance_mask(min_len, min_sig, update=True)
 
-    if contact_map.processed_map is None:
+    # if contact_map.processed_map is None:
+    if True:
+        print("Processing")
         contact_map.prepare_seq_map(norm=norm, bisto=bisto)
     _map = contact_map.get_subspace(marginalise=True, flatten=False)
 
@@ -527,7 +540,11 @@ def write_mcl(contact_map, fname, clustering):
     :param fname: output file name
     :param clustering: our clustering solution
     """
-    with open(fname, 'w') as outh:
+
+    index_path = os.path.join(os.path.dirname(fname), "index_to_id.tsv")
+    print(index_path)
+
+    with open(fname, 'w') as outh, open(index_path, 'w') as index_handle:
         seq_info = contact_map.seq_info
         # track those sequences that were rejected during filtering
         lost = np.ones(contact_map.total_seq, dtype=np.bool)
@@ -536,11 +553,14 @@ def write_mcl(contact_map, fname, clustering):
             # sequence wasn't lost to filtering
             lost[v['seq_ids']] = False
             cl_soln[k] = [seq_info[ix].name for ix in np.sort(v['seq_ids'])]
+            for (ix_ord, ix_seq) in zip(v['ord_ids'], v['seq_ids']):
+                index_handle.write("{}\t{}\t{}\n".format(ix_ord[0], ix_seq, seq_info[ix_seq].name))
 
         # create singleton clusters for all the lost sequences.
         # if these are left out, scoring measures aren't happy
         for n, ix in enumerate(np.argwhere(lost), len(cl_soln)):
             cl_soln[n] = [seq_info[ix[0]].name]
+            # index_handle.write("{}\t{}\n".format(ix[0], seq_info[ix[0]].name))
 
         clid_ascending = sorted(cl_soln.keys())
         for k in clid_ascending:

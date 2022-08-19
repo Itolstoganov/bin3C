@@ -1,6 +1,7 @@
-biopython
+biopython<1.75
 matplotlib
 networkx<2
+llvmlite==0.28
 numba<0.44
 numpy<1.15.0
 pandas
